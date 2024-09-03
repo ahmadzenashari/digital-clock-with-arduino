@@ -1,0 +1,91 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <RTClib.h>
+
+// Set alamat I2C LCD dan inisialisasi objek LCD
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// Inisialisasi RTC
+RTC_DS3231 rtc;
+
+// Definisi pin tombol
+const int buttonPin = 2;
+bool backlightOn = true;
+bool lastButtonState = HIGH; // Status tombol sebelumnya
+bool currentButtonState = HIGH; // Status tombol saat ini
+bool displayOn = true; // Menyimpan status tampilan
+
+void setup() {
+  // Inisialisasi pin tombol dengan pull-up internal
+  pinMode(buttonPin, INPUT_PULLUP);
+  
+  // Inisialisasi LCD
+  lcd.init();         // Initialize the LCD
+  lcd.begin(16, 2); 
+  lcd.backlight(); // Menghidupkan backlight LCD pertama kali
+
+  // Cek apakah RTC terhubung dengan baik
+  if (!rtc.begin()) {
+    lcd.setCursor(0, 0);
+    lcd.print("RTC Tidak Ditemukan");
+    while (1);
+  }
+
+  // Cek apakah RTC berjalan, jika tidak set ke waktu sekarang
+  if (rtc.lostPower()) {
+    lcd.setCursor(0, 1);
+    lcd.print("Mengatur Waktu...");
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
+}
+
+void loop() {
+  // Membaca status tombol
+  currentButtonState = digitalRead(buttonPin);
+
+  // Jika tombol ditekan (deteksi transisi dari HIGH ke LOW)
+  if (currentButtonState == LOW && lastButtonState == HIGH) {
+    delay(50); // Debounce delay
+    lastButtonState = LOW;
+    // Toggle displayOn
+    displayOn = !displayOn;
+
+    // Menyalakan atau mematikan backlight berdasarkan status displayOn
+    if (displayOn) {
+      lcd.backlight(); // Menghidupkan backlight
+    } else {
+      lcd.noBacklight(); // Mematikan backlight
+      lcd.clear(); // Mengosongkan layar
+    }
+  } 
+  // Jika tombol dilepas (deteksi transisi dari LOW ke HIGH)
+  else if (currentButtonState == HIGH && lastButtonState == LOW) {
+    lastButtonState = HIGH;
+  }
+
+  // Hanya menampilkan data waktu jika displayOn
+  if (displayOn) {
+    // Dapatkan waktu dari RTC
+    DateTime now = rtc.now();
+
+    // Menampilkan waktu di baris pertama
+    lcd.setCursor(0, 0);
+    lcd.print("Time: ");
+    lcd.print(now.hour());
+    lcd.print(':');
+    lcd.print(now.minute());
+    lcd.print(':');
+    lcd.print(now.second());
+
+    // Menampilkan tanggal di baris kedua
+    lcd.setCursor(0, 1);
+    lcd.print("Date: ");
+    lcd.print(now.day());
+    lcd.print('/');
+    lcd.print(now.month());
+    lcd.print('/');
+    lcd.print(now.year());
+  }
+
+  delay(100); // Update setiap 100 ms
+}
